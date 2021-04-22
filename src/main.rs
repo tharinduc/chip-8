@@ -1,5 +1,6 @@
 mod chip8;
 mod ram;
+mod cpu;
 
 use std::fs::File;
 use std::io::Read;
@@ -14,6 +15,6 @@ fn main() -> std::io::Result<()> {
 
     let mut chip8 = Chip8::new();
     chip8.load_rom(&game_data);
-    println!("Chip8: {:?}", chip8);
+//    println!("Chip8: {:?}", chip8);
     Ok(())
 }
