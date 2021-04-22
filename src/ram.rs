@@ -4,7 +4,7 @@ pub struct Ram {
 }
 
 impl Ram {
-    pub fn new() -> Self {
+    pub fn new() -> Ram {
         let mut ram = Ram { mem: [0; 4096] };
 
         let sprites: [[u8; 5]; 16] = [
@@ -33,7 +33,15 @@ impl Ram {
                 i += 1;
             }
         }
-        println!("Ram: {:x?}", ram);
+
         ram
+    }
+
+    pub fn write_byte(&mut self, address: u16, value: u8) {
+        self.mem[address as usize] = value;
+    }
+
+    pub fn read_byte(&mut self, address: u16) -> u8 {
+        self.mem[address as usize]
     }
 }
