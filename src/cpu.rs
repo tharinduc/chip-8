@@ -1,4 +1,6 @@
 use crate::ram::Ram;
+use rand::{thread_rng, Rng};
+
 
 pub const PROGRAM_START: u16 = 0x200;
 
@@ -23,7 +25,7 @@ impl Cpu {
         let hi = ram.read_byte(self.pc) as u16;
         let lo = ram.read_byte(self.pc + 1) as u16;
         let opcode: u16 = (hi <<  8) | lo;
-        println!("LO: {:#x}, HI: {:#x}, PC: {:#x}, INS: {:#x}", lo, hi, self.pc, opcode);
+        println!("HI: {:#X}, LO: {:#X}, PC: {:#X}, INS: {:#X}", hi, lo, self.pc, opcode);
         
         if hi == 0 && lo == 0 {
             panic!();
@@ -49,7 +51,7 @@ impl Cpu {
                             self.pc = addr;
                         }
                     },
-                    _ => panic!("Unrecognised 0x00** opcode {:#x} at {:#x}", opcode, self.pc),
+                    _ => panic!("Unrecognised 0x00** opcode {:#X} at {:#X}", opcode, self.pc),
                 }
             },
             0x1 => {
@@ -70,15 +72,133 @@ impl Cpu {
                     self.pc += 2;
                 }
             },
+            0x4 => {
+                // if(Vx!=NN)
+                let vx = self.read_reg_vx(x);
+                if vx != nn {
+                    self.pc += 4;
+                } else {
+                    self.pc += 2;
+                }
+            },
+            0x5 => {
+                // if(Vx==Vy)
+                let vx = self.read_reg_vx(x);
+                let vy = self.read_reg_vx(y);
+                if vx == vy {
+                    self.pc += 4;
+                } else {
+                    self.pc += 2;
+                }
+            },
             0x6 => {
                 // vx = nn
                 self.write_reg_vx(x, nn);
                 self.pc += 2;
             },
-            _ => panic!("Unrecognised opcode {:#x} at {:#x}", opcode, self.pc),
-        }
+            0x7 => {
+                // Vx += NN
+                let vx = self.read_reg_vx(x);
+                self.write_reg_vx(x, vx.wrapping_add(nn));
+                self.pc += 2;
+            },
+            0x8 => {
+                let vx = self.read_reg_vx(x);
+                let vy = self.read_reg_vx(y);
 
-        //self.pc += 2;
+                match n {
+                    0x0 => {
+                        // Vx=Vy
+                        self.write_reg_vx(x, vy);
+                    },
+                    0x1 => {
+                        // Vx=Vx|Vy
+                        self.write_reg_vx(x, vx | vy);
+                    },
+                    0x2 => {
+                        // Vx=Vx&Vy
+                        self.write_reg_vx(x, vx & vy);
+                    },
+                    0x3 => {
+                        // Vx=Vx^Vy
+                        self.write_reg_vx(x, vx ^ vy);
+                    },
+                    0x4 => {
+                        // Vx += Vy
+                        let sum = vx as u16 + vy as u16;
+                        self.write_reg_vx(x, sum as u8);
+                        if sum > 0xFF {
+                            self.write_reg_vx(0xF, 1);
+                        } else {
+                            self.write_reg_vx(0xF, 0);
+                        }
+                    },
+                    0x5 => {
+                        // Vx -= Vy
+                        let diff = vx as i8 - vy as i8;
+                        self.write_reg_vx(x, diff as u8);
+                        if diff < 0 {
+                            self.write_reg_vx(0xF, 0);
+                        } else {
+                            self.write_reg_vx(0xF, 1);
+                        }
+                    },
+                    0x6 => {
+                        // Vx>>=1
+                        let vx = self.read_reg_vx(x);
+                        self.write_reg_vx(0xF, vx & 0x1);
+                        self.write_reg_vx(x, vx >> 1);
+                    },
+                    0x7 => {
+                        // Vx=Vy-Vx
+                        let diff = vy as i8 - vx as i8;
+                        self.write_reg_vx(x, diff as u8);
+                        if diff < 0 {
+                            self.write_reg_vx(0xF, 0);
+                        } else {
+                            self.write_reg_vx(0xF, 1);
+                        }
+                    },
+                    0xE => {
+                        // Vx<<=1
+                        let vx = self.read_reg_vx(x);
+                        self.write_reg_vx(0xF, vx & 0x80);
+                        self.write_reg_vx(x, vx << 1);
+                    },
+                    _ => panic!("Unrecognised 0x8XY* opcode {:#X} at {:#X}", opcode, self.pc),
+                }
+
+                self.pc += 2;
+            },
+            0x9 => {
+                // if(Vx!=Vy)
+                let vx = self.read_reg_vx(x);
+                let vy = self.read_reg_vx(y);
+                if vx != vy {
+                    self.pc += 4;
+                } else {
+                    self.pc += 2;
+                }
+            },
+            0xA => {
+                // I = NNN
+                self.i = nnn;
+                self.pc += 2;
+            },
+            0xB => {
+                // PC=V0+NNN
+                let v0 = self.read_reg_vx(0);
+                self.pc = v0 as u16 + nnn;
+            },
+            0xC => {
+                // Vx=rand()&NN
+                let mut rng = thread_rng();
+                let num = rng.gen_range(0..255);
+                self.write_reg_vx(x, num & nn);
+                self.pc += 2;
+            },
+            _ => panic!("Unrecognised opcode {:#X} at {:#X}", opcode, self.pc),
+        }
     }
 
     pub fn write_reg_vx(&mut self, index: u16, value: u8) {
