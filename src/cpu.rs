@@ -26,16 +26,21 @@ impl Cpu {
         let lo = ram.read_byte(self.pc + 1) as u16;
         let opcode: u16 = (hi <<  8) | lo;
         println!("HI: {:#X}, LO: {:#X}, PC: {:#X}, INS: {:#X}", hi, lo, self.pc, opcode);
-        
+        print!("Vx: ");
+        for x in 0..self.vx.len() {
+            print!("{:#X} ", self.vx[x]);
+        }
+        println!("");
+
         if hi == 0 && lo == 0 {
             panic!();
         }
 
         let nnn = opcode & 0x0FFF;
         let nn = (opcode & 0x00FF) as u8;
-        let n = opcode & 0x000F;
-        let x = (opcode & 0x0F00) >> 8;
-        let y = (opcode & 0x00F0) >> 4;
+        let n = (opcode & 0x000F) as u8;
+        let x = ((opcode & 0x0F00) >> 8) as u8;
+        let y = ((opcode & 0x00F0) >> 4) as u8;
         
         match (opcode & 0xF000) >> 12 {
             0x0 => {
@@ -197,15 +202,41 @@ impl Cpu {
                 self.write_reg_vx(x, num & nn);
                 self.pc += 2;
             },
+            0xD => {
+                // draw(Vx,Vy,N)
+                self.debug_draw_sprite(ram, x, y, n);
+                self.pc += 2;
+            },
+            0xF => {
+                // I +=Vx
+                let vx = self.read_reg_vx(x);
+                self.i += vx as u16;
+                self.pc += 2;
+            },
             _ => panic!("Unrecognised opcode {:#X} at {:#X}", opcode, self.pc),
         }
     }
 
-    pub fn write_reg_vx(&mut self, index: u16, value: u8) {
+    pub fn debug_draw_sprite(&mut self, ram: &mut Ram, x: u8, y: u8, height: u8) {
+        for a in 0..height {
+            let mut b = ram.read_byte(self.i + a as u16);
+            for _ in 0..8 {
+                match (b & 0b1000_0000) >> 7 {
+                    0 => print!("_"),
+                    1 => print!("*"),
+                    _ => unreachable!(),
+                }
+                b = b << 1;
+            }
+            print!("\n");
+        }
+    }
+
+    pub fn write_reg_vx(&mut self, index: u8, value: u8) {
         self.vx[index as usize] = value;
     }
     
-    pub fn read_reg_vx(&mut self, index: u16) -> u8 {
+    pub fn read_reg_vx(&mut self, index: u8) -> u8 {
         self.vx[index as usize]
     }
 }
